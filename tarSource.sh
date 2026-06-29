@@ -3,31 +3,64 @@ set -eu
 
 base=${PWD##*/}
 out="$HOME/outgoing/$base.tar.gz"
+exclude_file="$(mktemp)"
+
+mkdir -p "$HOME/outgoing"
+
+cat > "$exclude_file" <<'EOF'
+./.git
+./.gitignore
+./.gitattributes
+./.settings
+./.classpath
+./.project
+./bin
+./build
+./out
+./target
+./dist
+./node_modules
+./.gradle
+./.idea
+./.vscode
+*/__pycache__
+*/__pycache__/*
+*.pyc
+*/.pytest_cache
+*/.pytest_cache/*
+*/.mypy_cache
+*/.mypy_cache/*
+*/.ruff_cache
+*/.ruff_cache/*
+./.venv
+*/.venv
+*/.venv/*
+./checkpoints
+./checkpoints/*
+./plots
+./plots/*
+./tmp
+./tmp/*
+./runs/*/checkpoints
+./runs/*/checkpoints/*
+./runs/*/plots
+./runs/*/plots/*
+.coverage
+./.claude
+./.claude/*
+./src/tinyllm.egg-info
+./src/tinyllm.egg-info/*
+
+
+
+EOF
 
 tar -czf "$out" \
-  --exclude='./.git' \
-  --exclude='./.gitignore' \
-  --exclude='./.gitattributes' \
-  --exclude='./.settings' \
-  --exclude='./.classpath' \
-  --exclude='./.project' \
-  --exclude='./bin' \
-  --exclude='./build' \
-  --exclude='./*/bin' \
-  --exclude='./*/build' \
-  --exclude='./out' \
-  --exclude='./target' \
-  --exclude='./dist' \
-  --exclude='./node_modules' \
-  --exclude='./.gradle/' \
-  --exclude='./.gradle/**' \
-  --exclude='./.idea' \
-  --exclude='./.vscode' \
-  --exclude='./__pycache__' \
-  --exclude='./.pytest_cache' \
-  --exclude='./.mypy_cache' \
-  --exclude='./.ruff_cache' \
-  --exclude='./.venv' \
-  --exclude-vcs   \
+  --exclude-vcs \
+  --exclude-from="$exclude_file" \
   .
+
+rm -f "$exclude_file"
+
 echo "Wrote $out"
+
