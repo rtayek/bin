@@ -1,0 +1,15 @@
+# Temp files
+.tmp*
+*.tmp
+*.temp
+~*
+*.bak
+*.swp
+
+# Windows junk
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+

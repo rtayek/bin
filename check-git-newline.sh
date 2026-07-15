@@ -1,5 +1,5 @@
 
-#!/bin/sh
+#!/bin/bash
 
 # check-git-newlines.sh
 # Find Git repos under a root folder and report:
