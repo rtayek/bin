@@ -1,0 +1,34 @@
+# Windows 11 Terminal Clipboard Quick Reference
+
+Terminal shortcut behavior varies because different command-line environments handle the mouse and clipboard using separate systems. Use this guide to navigate the correct shortcuts for your environment.
+
+## Universal Safe Shortcuts
+These keyboard combinations work identically across almost every terminal environment in existence. Use them to avoid accidental command execution or app hangs.
+* **To Copy:** Highlight the text with your mouse and press `Ctrl` + `Insert`
+* **To Paste:** Click the prompt line and press `Shift` + `Insert`
+
+---
+
+## Shortcut Behavior Matrix
+
+| Environment | Copy Text | Paste Text | Right-Click Action |
+| :--- | :--- | :--- | :--- |
+| **Git Bash / Mintty** | Highlight with mouse | `Shift` + `Insert` | Instantly **Pastes** your clipboard contents |
+| **PowerShell / CMD** | Highlight text + `Enter` | `Ctrl` + `V` | **Copies** selection or **Pastes** if empty |
+| **Windows Terminal** | `Ctrl` + `C` | `Ctrl` + `V` | Opens a **Menu** or Pastes automatically |
+
+---
+
+## Environment Breakdown & Gotchas
+
+### 1. Git Bash / Linux Shells
+* **The Conflict:** `Ctrl + C` is reserved to kill/abort running programs, and `Ctrl + V` triggers text modifications.
+* **The Fix:** Highlight text to auto-copy it. Right-clicking or pressing `Shift + Insert` will paste it.
+
+### 2. PowerShell & Classic DOS
+* **The Conflict:** Relies on legacy **QuickEdit Mode** settings.
+* **The Fix:** Highlighting text and right-clicking copies it to your clipboard. Right-clicking an empty prompt line pastes it.
+
+### 3. Modern Windows Terminal (Windows 11 Default)
+* **The Conflict:** Intercepts inputs before they reach the backend shell to mimic modern Windows.
+* **The Fix:** Standard `Ctrl + C` and `Ctrl + V` work natively here.

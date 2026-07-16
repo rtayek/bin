@@ -1,5 +1,5 @@
 #!/bin/sh
-# Windows 11 Workbench - High-Contrast Header Accent Multi-Launcher
+# Windows 11 Workbench - Dynamic Folder Navigation Multi-Launcher
 
 # 1. THE CYCLE LOGIC: Pick a random theme if no color is specified
 COLOR_ARRAY=("Red" "Green" "Blue" "Cyan" "Magenta" "Yellow")
@@ -23,17 +23,19 @@ case "$PROJECT_COLOR" in
     *)         COLOR_HEX="#808080" ;;
 esac
 
-# Dynamic Folder Tracking: Extracts only the last folder name on your path
+# 3. DIRECTORY CAPTURE: Grabs the clean folder name AND the full structural path
 CURRENT_FOLDER=$(basename "$(pwd)")
-echo "Spawning 4 boxes with a vibrant $PROJECT_COLOR header accent line for folder '$CURRENT_FOLDER'..."
+FULL_PROJECT_PATH=$(pwd)
+
+echo "Spawning 4 boxes for '$CURRENT_FOLDER' and auto-navigating to path..."
 
 BASH=/usr/bin/bash
 
-# Uses --tabColor to paint the header bar while keeping the main terminal body black!
+# Uses -d to force every spawned tab to boot up directly inside the project directory!
 wt.exe --pos 0,0 --maximized \
---tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 1" $BASH.exe ';' \
-new-tab --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 2" $BASH.exe ';' \
-new-tab --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 3" $BASH.exe ';' \
-new-tab --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 4" $BASH.exe
+-d "$FULL_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 1" $BASH.exe ';' \
+new-tab -d "$FULL_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 2" $BASH.exe ';' \
+new-tab -d "$FULL_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 3" $BASH.exe ';' \
+new-tab -d "$FULL_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 4" $BASH.exe
 
-echo "Done! Clean text-only workspace deployed."
+echo "Done! Clean text-only workspace deployed at project root."
