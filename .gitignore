@@ -1,3 +1,10 @@
+# installed binaries - not my code, don't version
+*.exe
+direnv
+
+# scratch
+copy-paste.txt
+
 # Temp files
 .tmp*
 *.tmp

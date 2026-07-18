@@ -8,6 +8,6 @@ echo "Launching your custom Chrome window containers with full group memory..."
 
 # Uses the official system start utility to trigger Chrome using its standard
 # shortcut link profile, restoring all your active window names and tab groups!
-cmd.exe /c "start chrome"
+cmd.exe /c "start chrome --new-window"
 
 echo "Done! Full workspace layout and tab groups deployed successfully."
