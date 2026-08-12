@@ -1,3 +1,4 @@
+#!/bin/sh
 for file in frog .profile .bash_history .bash_aliases .bash_profile  .bashrc
     do
     echo $file
