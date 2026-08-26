@@ -3,13 +3,17 @@
 PORT=1031
 WORK_DIR=/c/Users/ray
 OPEN_BROWSER=1
+DETACH=0
 WIN_BASH_PATH='C:\Program Files\Git\bin\bash.exe'
 
 usage() {
     cat <<'EOF'
-Usage: webterm.sh [--no-browser] [PORT] [DIRECTORY]
+Usage: webterm.sh [--detach] [--no-browser] [PORT] [DIRECTORY]
 
-Start a detached ttyd web terminal running Git Bash.
+Start a ttyd web terminal running Git Bash.
+
+By default ttyd stays in the foreground so Ctrl-C stops it.
+Use --detach when another launcher should own the ttyd process.
 
 Defaults:
   PORT       1031
@@ -19,18 +23,34 @@ Examples:
   webterm.sh
   webterm.sh 1032 /g/pt/chatmap
   webterm.sh --no-browser 1033 /g/pt/chatmap
+  webterm.sh --detach --no-browser 1034 /g/pt/chatmap
 EOF
 }
 
-if [ "${1-}" = "--help" ] || [ "${1-}" = "-h" ]; then
-    usage
-    exit 0
-fi
-
-if [ "${1-}" = "--no-browser" ]; then
-    OPEN_BROWSER=0
-    shift
-fi
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --no-browser)
+            OPEN_BROWSER=0
+            shift
+            ;;
+        --detach)
+            DETACH=1
+            shift
+            ;;
+        --*)
+            echo "Error: unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 if [ $# -gt 0 ]; then
     PORT=$1
@@ -91,6 +111,19 @@ if port_in_use; then
     exit 0
 fi
 
+if [ "$DETACH" -eq 0 ]; then
+    echo "Starting web terminal on $URL"
+    echo "Directory: $WORK_DIR"
+    echo "Press Ctrl-C to stop it."
+
+    if [ "$OPEN_BROWSER" -eq 1 ]; then
+        (sleep 1; open_browser) &
+    fi
+
+    exec "$TTY_CMD" -p "$PORT" -W --cwd "$WORK_DIR" \
+        "$WIN_BASH_PATH" --login -i
+fi
+
 nohup "$TTY_CMD" -p "$PORT" -W --cwd "$WORK_DIR" \
     "$WIN_BASH_PATH" --login -i \
     >"$LOG_FILE" 2>&1 </dev/null &
@@ -102,6 +135,7 @@ while [ "$COUNT" -lt 25 ]; do
     if port_in_use; then
         echo "Web terminal started at $URL"
         echo "Directory: $WORK_DIR"
+        echo "PID: $TTY_PID"
         echo "Log: $LOG_FILE"
         if [ "$OPEN_BROWSER" -eq 1 ]; then
             open_browser
