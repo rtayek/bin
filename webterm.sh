@@ -1,35 +1,158 @@
 #!/bin/sh
 
-# 1. Configuration
 PORT=1031
-URL="http://127.0.0.1:1031"
-WIN_BASH_PATH="C:\\Program Files\\Git\\bin\\bash.exe"
-SAFE_CWD="/c/Users/ray"
+WORK_DIR=/c/Users/ray
+OPEN_BROWSER=1
+DETACH=0
+WIN_BASH_PATH='C:\Program Files\Git\bin\bash.exe'
 
-# 2. Check if ttyd is available
-if command -v ttyd > /dev/null 2>&1; then
-    TTY_CMD="ttyd"
-elif command -v ttyd.win32.exe > /dev/null 2>&1; then
-    TTY_CMD="ttyd.win32.exe"
+usage() {
+    cat <<'EOF'
+Usage: webterm.sh [--detach] [--no-browser] [PORT] [DIRECTORY]
+
+Start a ttyd web terminal running Git Bash.
+
+By default ttyd stays in the foreground so Ctrl-C stops it.
+Use --detach when another launcher should own the ttyd process.
+
+Defaults:
+  PORT       1031
+  DIRECTORY  /c/Users/ray
+
+Examples:
+  webterm.sh
+  webterm.sh 1032 /g/pt/chatmap
+  webterm.sh --no-browser 1033 /g/pt/chatmap
+  webterm.sh --detach --no-browser 1034 /g/pt/chatmap
+EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --no-browser)
+            OPEN_BROWSER=0
+            shift
+            ;;
+        --detach)
+            DETACH=1
+            shift
+            ;;
+        --*)
+            echo "Error: unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [ $# -gt 0 ]; then
+    PORT=$1
+    shift
+fi
+
+if [ $# -gt 0 ]; then
+    WORK_DIR=$1
+    shift
+fi
+
+if [ $# -gt 0 ]; then
+    usage >&2
+    exit 2
+fi
+
+case "$PORT" in
+    ''|*[!0-9]*)
+        echo "Error: PORT must be numeric." >&2
+        exit 2
+        ;;
+esac
+
+if [ ! -d "$WORK_DIR" ]; then
+    echo "Error: directory does not exist: $WORK_DIR" >&2
+    exit 2
+fi
+
+if command -v ttyd >/dev/null 2>&1; then
+    TTY_CMD=ttyd
+elif command -v ttyd.win32.exe >/dev/null 2>&1; then
+    TTY_CMD=ttyd.win32.exe
 else
-    echo "Error: ttyd could not be found."
-    echo "Please run 'winget install tsl0922.ttyd' or download ttyd.win32.exe first."
+    echo "Error: ttyd could not be found." >&2
+    echo "Install it with: winget install tsl0922.ttyd" >&2
     exit 1
 fi
 
-# 3. Check if port 1031 is already in use
-if netstat -ano | grep ":${PORT} " > /dev/null 2>&1; then
-    echo "Port ${PORT} is already in use. Opening browser tab to the existing session..."
-    cmd.exe /c start "$URL" > /dev/null 2>&1
+URL="http://127.0.0.1:$PORT"
+STATE_DIR="${TMPDIR:-/tmp}/webterm"
+LOG_FILE="$STATE_DIR/webterm-$PORT.log"
+PID_FILE="$STATE_DIR/webterm-$PORT.pid"
+mkdir -p "$STATE_DIR" || exit 1
+
+port_in_use() {
+    netstat -ano 2>/dev/null | grep ":${PORT} " >/dev/null 2>&1
+}
+
+open_browser() {
+    cmd.exe /c start "" "$URL" >/dev/null 2>&1
+}
+
+if port_in_use; then
+    echo "Web terminal already available at $URL"
+    if [ "$OPEN_BROWSER" -eq 1 ]; then
+        open_browser
+    fi
     exit 0
 fi
 
-# 4. Launch the browser tab asynchronously after a 1-second pause
-(sleep 1; cmd.exe /c start "$URL" > /dev/null 2>&1) &
+if [ "$DETACH" -eq 0 ]; then
+    echo "Starting web terminal on $URL"
+    echo "Directory: $WORK_DIR"
+    echo "Press Ctrl-C to stop it."
 
-# 5. Start the web terminal server with the working writable parameters
-echo "Starting web terminal on ${URL}..."
-echo "Press Ctrl+C in this window to shut down the browser server."
-echo "------------------------------------------------------------------"
+    if [ "$OPEN_BROWSER" -eq 1 ]; then
+        (sleep 1; open_browser) &
+    fi
 
-$TTY_CMD -p "$PORT" -W --cwd "$SAFE_CWD" "$WIN_BASH_PATH" --login -i
+    exec "$TTY_CMD" -p "$PORT" -W --cwd "$WORK_DIR" \
+        "$WIN_BASH_PATH" --login -i
+fi
+
+nohup "$TTY_CMD" -p "$PORT" -W --cwd "$WORK_DIR" \
+    "$WIN_BASH_PATH" --login -i \
+    >"$LOG_FILE" 2>&1 </dev/null &
+TTY_PID=$!
+echo "$TTY_PID" >"$PID_FILE"
+
+COUNT=0
+while [ "$COUNT" -lt 25 ]; do
+    if port_in_use; then
+        echo "Web terminal started at $URL"
+        echo "Directory: $WORK_DIR"
+        echo "PID: $TTY_PID"
+        echo "Log: $LOG_FILE"
+        if [ "$OPEN_BROWSER" -eq 1 ]; then
+            open_browser
+        fi
+        exit 0
+    fi
+
+    if ! kill -0 "$TTY_PID" 2>/dev/null; then
+        echo "Error: ttyd exited before opening port $PORT." >&2
+        echo "Log: $LOG_FILE" >&2
+        exit 1
+    fi
+
+    sleep 0.2
+    COUNT=$((COUNT + 1))
+done
+
+echo "Error: ttyd did not open port $PORT." >&2
+echo "Log: $LOG_FILE" >&2
+exit 1
