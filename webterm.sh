@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PORT=1031
-WORK_DIR=$(pwd)
+WORK_DIR=/c/Users/ray
 OPEN_BROWSER=1
 WIN_BASH_PATH='C:\Program Files\Git\bin\bash.exe'
 
@@ -13,7 +13,7 @@ Start a detached ttyd web terminal running Git Bash.
 
 Defaults:
   PORT       1031
-  DIRECTORY  current directory
+  DIRECTORY  /c/Users/ray
 
 Examples:
   webterm.sh
