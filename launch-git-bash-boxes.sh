@@ -12,30 +12,28 @@ else
     PROJECT_COLOR="$RANDOM_COLOR"
 fi
 
-# 2. THE ACCENT MAP: Route the color name to a vibrant tab/title bar hex code
+# 2. THE ACCENT MAP: Match the Windows Terminal profile background colors
 case "$PROJECT_COLOR" in
-    "Red")     COLOR_HEX="#FF0000" ;;
-    "Green")   COLOR_HEX="#00FF00" ;;
-    "Blue")    COLOR_HEX="#0000FF" ;;
-    "Cyan")    COLOR_HEX="#00FFFF" ;;
-    "Magenta") COLOR_HEX="#FF00FF" ;;
-    "Yellow")  COLOR_HEX="#FFFF00" ;;
-    *)         COLOR_HEX="#808080" ;;
+    "Red")     COLOR_HEX="#3A0000" ;;
+    "Green")   COLOR_HEX="#003A00" ;;
+    "Blue")    COLOR_HEX="#00003A" ;;
+    "Cyan")    COLOR_HEX="#003A3A" ;;
+    "Magenta") COLOR_HEX="#3A003A" ;;
+    "Yellow")  COLOR_HEX="#3A3A00" ;;
+    *)          COLOR_HEX="#3A3A3A" ;;
 esac
 
-# 3. DIRECTORY CAPTURE: Grabs the clean folder name AND the full structural path
+# 3. DIRECTORY CAPTURE: Windows Terminal needs a Windows path for -d
 CURRENT_FOLDER=$(basename "$(pwd)")
-FULL_PROJECT_PATH=$(pwd)
+WIN_PROJECT_PATH=$(cygpath -w "$(pwd)")
 
-echo "Spawning 4 boxes for '$CURRENT_FOLDER' and auto-navigating to path..."
+echo "Spawning 4 boxes using '$PROJECT_COLOR' profile for '$CURRENT_FOLDER'..."
 
-BASH=/usr/bin/bash
-
-# Uses -d to force every spawned tab to boot up directly inside the project directory!
+# Use the named profile so the terminal background and tab accent stay in sync.
 wt.exe --pos 0,0 --maximized \
--d "$FULL_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 1" $BASH.exe ';' \
-new-tab -d "$FULL_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 2" $BASH.exe ';' \
-new-tab -d "$FULL_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 3" $BASH.exe ';' \
-new-tab -d "$FULL_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 4" $BASH.exe
+-p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 1" ';' \
+new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 2" ';' \
+new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 3" ';' \
+new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 4"
 
 echo "Done! Clean text-only workspace deployed at project root."
