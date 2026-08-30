@@ -26,4 +26,4 @@ restart_webterm() {
 
 restart_webterm 1031 /c/Users/ray/dotfiles
 restart_webterm 1032 /c/Users/ray/eclipse-workspace/dotmdfiles
-restart_webterm 1033 /c/Users/ray/eclipse-workspace/cjatmanager
+restart_webterm 1033 /c/Users/ray/eclipse-workspace/chatmap

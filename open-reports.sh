@@ -9,7 +9,25 @@
 
 set -e
 
-REPO="/c/Users/ray/eclipse-workspace/cjatmanager"
+# Walk up from the current directory looking for a build/ folder,
+# so this works from any gradle project instead of a hardcoded path.
+find_repo_root() {
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+        if [ -d "$dir/build" ]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+REPO="$(find_repo_root)" || {
+    echo "No build/ folder found in $PWD or any parent directory."
+    echo "Run this from within (or below) a gradle project that has been built."
+    exit 1
+}
 cd "$REPO"
 
 REPORTS=(

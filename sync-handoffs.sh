@@ -14,7 +14,7 @@
 
 set -e
 
-REPO="/c/Users/ray/eclipse-workspace/cjatmanager"
+REPO="/c/Users/ray/eclipse-workspace/chatmap"
 DOWNLOADS="$HOME/Downloads"
 HANDOFFS="$REPO/handoffs"
 
