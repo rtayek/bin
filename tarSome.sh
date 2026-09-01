@@ -2,9 +2,9 @@
 set -eu
 
 base=${PWD##*/}
-out="$HOME/outgoing/$base.tar.gz"
+out="$HOME/outgoing/$base.tar"
 
-tar -czf "$out" \
+tar -cf "$out" \
     src \
     tst \
     handoffs \
