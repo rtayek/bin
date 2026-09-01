@@ -26,14 +26,15 @@ esac
 # 3. DIRECTORY CAPTURE: Windows Terminal needs a Windows path for -d
 CURRENT_FOLDER=$(basename "$(pwd)")
 WIN_PROJECT_PATH=$(cygpath -w "$(pwd)")
+export PROJECT_TERMINAL_NAME="$CURRENT_FOLDER"
 
 echo "Spawning 4 boxes using '$PROJECT_COLOR' profile for '$CURRENT_FOLDER'..."
 
 # Use the named profile so the terminal background and tab accent stay in sync.
 wt.exe --pos 0,0 --maximized \
--p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 1" ';' \
-new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 2" ';' \
-new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 3" ';' \
-new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 4"
+	-p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --inheritEnvironment --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 1" ';' \
+	new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --inheritEnvironment --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 2" ';' \
+	new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --inheritEnvironment --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 3" ';' \
+	new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --inheritEnvironment --tabColor "$COLOR_HEX" --title "$CURRENT_FOLDER 4"
 
 echo "Done! Clean text-only workspace deployed at project root."
