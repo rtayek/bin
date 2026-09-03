@@ -56,6 +56,8 @@ if grep -q "restart_webterm $PORT " "$WEBTERMS"; then
   echo "-- launch-webterms.sh already has port $PORT, skipping --"
 else
   echo "-- adding port $PORT to launch-webterms.sh --"
+  # guard against a missing trailing newline gluing the new line onto the old one
+  [ -z "$(tail -c1 "$WEBTERMS")" ] || printf '\n' >> "$WEBTERMS"
   printf 'restart_webterm %s %s\n' "$PORT" "$DIR" >> "$WEBTERMS"
 fi
 echo
