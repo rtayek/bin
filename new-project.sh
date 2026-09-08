@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# new-project.sh — wire a new project up to the standard set of tools.
+# new-project.sh - wire a new project up to the standard set of tools.
 #
 # Runs, in order:
 #   1. dotmdfiles/bin/setup-project.sh   (CLAUDE.md, AGENTS.md, persona.md, human.md)
