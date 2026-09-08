@@ -9,6 +9,8 @@
 #
 # Usage:
 #   new-project.sh <name> [target-dir] [port]
+#   new-project.sh -h
+#   new-project.sh --help
 #
 #   name         Project name, used for the title/links (e.g. five-rules)
 #   target-dir   Defaults to ~/eclipse-workspace/<name>
@@ -21,12 +23,42 @@
 
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage:
+  new-project.sh <name> [target-dir] [port]
+  new-project.sh -h
+  new-project.sh --help
+
+Arguments:
+  name        Project name, for example five-rules
+  target-dir  Default: ~/eclipse-workspace/<name>
+  port        Default: next unused webterm port
+EOF
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  "")
+    usage >&2
+    exit 2
+    ;;
+  -*)
+    echo "new-project.sh: invalid project name: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
 DOTFILES="$HOME/dotfiles"
 DOTMDFILES="$HOME/eclipse-workspace/dotmdfiles"
 WEBTERMS="$DOTFILES/bin/launch-webterms.sh"
 MACRO="$DOTFILES/templates/project-home.html.macro"
 
-NAME="${1:?usage: new-project.sh <name> [target-dir] [port]}"
+NAME="$1"
 DIR="${2:-$HOME/eclipse-workspace/$NAME}"
 PORT="${3:-}"
 
