@@ -103,6 +103,5 @@ fi
 echo
 echo "Done. Remaining manual steps:"
 echo "  - run 'direnv allow' in $DIR"
-echo "  - add a Windows Terminal profile/color for $NAME"
 echo "  - create a Chrome tab group and add $HOME_HTML as the anchor tab"
 echo "  - commit and push the launch-webterms.sh change in dotfiles"
