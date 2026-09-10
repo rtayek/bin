@@ -94,6 +94,7 @@ if [[ $conflict == true ]]; then
 fi
 
 moved_any=false
+moved_paths=()
 for file in "${downloaded_handoffs[@]}"; do
     base=$(basename "$file")
     clean=$(sed -E 's/ \([0-9]+\)\.md$/.md/' <<<"$base")
@@ -109,6 +110,7 @@ for file in "${downloaded_handoffs[@]}"; do
     else
         mv "$file" "$destination"
         echo "Moved: $base -> $handoffs_rel/$clean"
+        moved_paths+=("$handoffs_rel/$clean")
     fi
     moved_any=true
 done
@@ -124,20 +126,20 @@ if [[ $dry_run == true ]]; then
 fi
 
 cd "$repo"
-git add -- "$handoffs_rel/"
+git add -- "${moved_paths[@]}"
 
-if git diff --cached --quiet; then
+if git diff --cached --quiet -- "${moved_paths[@]}"; then
     echo "Nothing new to commit."
     exit 0
 fi
 
 echo
 echo "Staged changes:"
-git status --short -- "$handoffs_rel/"
+git status --short -- "${moved_paths[@]}"
 echo
 
 message=${1:-"Add handoff docs $(date +%Y-%m-%d)"}
-git commit -m "$message"
+git commit -m "$message" -- "${moved_paths[@]}"
 git push
 
 echo
