@@ -3,7 +3,7 @@
 #
 # Runs, in order:
 #   1. dotmdfiles/bin/setup-project.sh   (CLAUDE.md, AGENTS.md, persona.md, human.md)
-#   2. next free webterm port + launch-webterms.sh entry
+#   2. reuse or allocate webterm port + launch-webterms.sh entry
 #   3. project-home.html generated from the dotfiles template
 #   4. .envrc with PROJECT_TERMINAL_NAME (and useProjectHistory if new)
 #
@@ -14,8 +14,8 @@
 #
 #   name         Project name, used for the title/links (e.g. five-rules)
 #   target-dir   Defaults to ~/eclipse-workspace/<name>
-#   port         Defaults to the next unused port after the highest one
-#                already in launch-webterms.sh
+#   port         Reuses the registered project port when present; otherwise
+#                defaults to the next unused port after the highest one
 #
 # Example:
 #   new-project.sh five-rules
@@ -33,7 +33,7 @@ Usage:
 Arguments:
   name        Project name, for example five-rules
   target-dir  Default: ~/eclipse-workspace/<name>
-  port        Default: next unused webterm port
+  port        Reuse registered port, otherwise next unused webterm port
 EOF
 }
 
@@ -67,10 +67,37 @@ PORT="${3:-}"
 [ -x "$DOTMDFILES/bin/setup-project.sh" ] ||
   { echo "missing $DOTMDFILES/bin/setup-project.sh" >&2; exit 1; }
 
-if [ -z "$PORT" ]; then
-  PORT=$(grep -oE 'restart_webterm [0-9]+' "$WEBTERMS" |
-    awk '{print $2}' | sort -n | tail -1)
-  PORT=$((PORT + 1))
+existing_port=$(
+  awk -v dir="$DIR" '
+    $1 == "restart_webterm" && $3 == dir {
+      print $2
+      exit
+    }
+  ' "$WEBTERMS"
+)
+
+if [ -n "$existing_port" ]; then
+  if [ -n "$PORT" ] && [ "$PORT" != "$existing_port" ]; then
+    echo "error: $DIR is already registered on port $existing_port" >&2
+    exit 1
+  fi
+  PORT=$existing_port
+else
+  if [ -z "$PORT" ]; then
+    PORT=$(
+      awk '
+        $1 == "restart_webterm" && $2 + 0 > max { max = $2 + 0 }
+        END { print max + 1 }
+      ' "$WEBTERMS"
+    )
+  elif awk -v port="$PORT" '
+    $1 == "restart_webterm" && $2 == port { found=1 }
+    END { exit !found }
+  ' "$WEBTERMS"
+  then
+    echo "error: port $PORT is already registered to another project" >&2
+    exit 1
+  fi
 fi
 
 echo "Project:    $NAME"
@@ -84,11 +111,15 @@ echo "-- setup-project.sh --"
 echo
 
 # 2. launch-webterms.sh entry
-if grep -q "restart_webterm $PORT " "$WEBTERMS"; then
-  echo "-- launch-webterms.sh already has port $PORT, skipping --"
+if awk -v dir="$DIR" '
+  $1 == "restart_webterm" && $3 == dir { found=1 }
+  END { exit !found }
+' "$WEBTERMS"
+then
+  echo "-- launch-webterms.sh already has $DIR on port $PORT, skipping --"
 else
   echo "-- adding port $PORT to launch-webterms.sh --"
-  # guard against a missing trailing newline gluing the new line onto the old one
+  # Guard against a missing trailing newline gluing the new line onto the old one.
   [ -z "$(tail -c1 "$WEBTERMS")" ] || printf '\n' >> "$WEBTERMS"
   printf 'restart_webterm %s %s\n' "$PORT" "$DIR" >> "$WEBTERMS"
 fi
@@ -136,4 +167,4 @@ echo
 echo "Done. Remaining manual steps:"
 echo "  - run 'direnv allow' in $DIR"
 echo "  - create a Chrome tab group and add $HOME_HTML as the anchor tab"
-echo "  - commit and push the launch-webterms.sh change in dotfiles"
+echo "  - commit and push the launch-webterms.sh change in dotfiles if it changed"
