@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the default fallback directory
-DEFAULT_DIR="handoffs"
+DEFAULT_DIR=".llm/handoffs"
 
 # Case 1: No arguments provided -> default to handoffs folder with a standard head
 if [ $# -eq 0 ]; then
@@ -19,7 +19,7 @@ fi
 
 # Verify the determined target directory exists
 if [ -d "$TARGET_DIR" ]; then
-    ls -t "$TARGET_DIR" | head -4
+    ls -t "$TARGET_DIR" | head -12
 else
     echo "Error: Directory '$TARGET_DIR' does not exist." >&2
     exit 1
