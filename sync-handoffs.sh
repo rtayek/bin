@@ -17,6 +17,41 @@
 
 set -euo pipefail
 
+# Known project codes and where their local checkouts live, for routing
+# a handoff away from the current repo when its filename names a
+# different project. Fill in any paths that are missing or wrong for
+# this machine. A code with no path here is treated as unknown -- such a
+# file is left in Downloads with a warning rather than guessed at.
+declare -A KNOWN_PROJECT_PATHS=(
+    [SYS]="$HOME/eclipse-workspace/system"
+    [CM]="$HOME/eclipse-workspace/chatmap"
+    [DMF]="$HOME/eclipse-workspace/dotmdfiles"
+    [DF]="$HOME/eclipse-workspace/dotfiles"
+)
+
+# Extract the destination project code from a handoff filename, if the
+# filename states one at all. Checks the "-to-<CODE>-" field first (the
+# from-to naming convention), then falls back to a bare "-<CODE>-" token.
+# Returns empty when no known code is found, including plain "misc" or
+# legacy filenames that predate the convention -- those are left to sync
+# into whichever repo the script is run from, same as before this patch.
+destination_code_for() {
+    local name=$1 upper
+    upper=${name^^}
+    if [[ $upper =~ -TO-([A-Z]+)- ]] || [[ $upper =~ -TO-([A-Z]+)\.MD$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
+    local code
+    for code in "${!KNOWN_PROJECT_PATHS[@]}"; do
+        if [[ $upper == *"-$code-"* ]]; then
+            echo "$code"
+            return
+        fi
+    done
+    echo ""
+}
+
 dry_run=false
 if [[ ${1:-} == "--dry-run" ]]; then
     dry_run=true
@@ -37,6 +72,13 @@ if ! repo=$(git rev-parse --show-toplevel 2>/dev/null); then
     echo "Run sync-handoffs.sh from inside the target Git repository." >&2
     exit 1
 fi
+
+current_code=""
+for code in "${!KNOWN_PROJECT_PATHS[@]}"; do
+    if [[ ${KNOWN_PROJECT_PATHS[$code]} == "$repo" ]]; then
+        current_code=$code
+    fi
+done
 
 downloads=${DOWNLOADS_DIR:-"$HOME/Downloads"}
 
@@ -71,6 +113,73 @@ shopt -u nullglob nocaseglob
 
 if (( ${#downloaded_handoffs[@]} == 0 )); then
     echo "No handoff files found in $downloads."
+    exit 0
+fi
+
+# Route by filename before touching anything. A file with no destination
+# code, or "misc", or a code matching the current repo, belongs here and
+# is handled by the existing logic below unchanged. A file naming a
+# different known project is copied to that project's own handoffs/ and
+# left for a commit there, not committed from this repo. A file naming a
+# code this script does not recognize is left in Downloads with a
+# warning rather than guessed at.
+local_handoffs=()
+for file in "${downloaded_handoffs[@]}"; do
+    base=$(basename "$file")
+    code=$(destination_code_for "$base")
+
+    if [[ -z $code || $code == MISC || $code == "$current_code" ]]; then
+        local_handoffs+=("$file")
+        continue
+    fi
+
+    target_repo=${KNOWN_PROJECT_PATHS[$code]:-}
+    if [[ -z $target_repo ]]; then
+        echo "Unrecognized project code '$code' in $base, left in place." >&2
+        continue
+    fi
+
+    if [[ ! -d $target_repo ]]; then
+        echo "Warning: $base names project $code, but $target_repo does not exist. Left in place." >&2
+        continue
+    fi
+
+    if [[ -d "$target_repo/.llm/handoffs" ]]; then
+        target_handoffs_rel=.llm/handoffs
+    elif [[ -d "$target_repo/handoffs" ]]; then
+        target_handoffs_rel=handoffs
+    else
+        target_handoffs_rel=.llm/handoffs
+        if [[ $dry_run == false ]]; then
+            mkdir -p "$target_repo/$target_handoffs_rel"
+        fi
+    fi
+
+    clean=$(sed -E 's/ \([0-9]+\)\.md$/.md/' <<<"$base")
+    target_destination="$target_repo/$target_handoffs_rel/$clean"
+
+    if [[ -f $target_destination ]] && cmp -s "$file" "$target_destination"; then
+        echo "Skipping identical duplicate already routed: $base"
+        if [[ $dry_run == false ]]; then
+            rm "$file"
+        fi
+        continue
+    fi
+
+    if [[ $dry_run == true ]]; then
+        echo "Would route: $base -> $code ($target_repo/$target_handoffs_rel/$clean), not committed"
+        continue
+    fi
+
+    cp "$file" "$target_destination"
+    rm "$file"
+    echo "Routed, NOT committed: $base -> $target_repo/$target_handoffs_rel/$clean"
+    echo "  (review and commit it from within that project yourself)"
+done
+downloaded_handoffs=("${local_handoffs[@]}")
+
+if (( ${#downloaded_handoffs[@]} == 0 )); then
+    echo "No handoff files remain for this project after routing."
     exit 0
 fi
 
