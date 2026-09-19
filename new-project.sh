@@ -134,6 +134,7 @@ else
   sed \
     -e "s|PROJECT_NAME|$NAME|g" \
     -e "s|BASH_URL|http://127.0.0.1:$PORT/|g" \
+    # editor was here
     -e "s|CHATGPT_URL|https://chatgpt.com/|g" \
     -e "s|CLAUDE_URL|https://claude.ai/|g" \
     -e "s|GITHUB_URL|https://github.com/rtayek/$NAME|g" \
