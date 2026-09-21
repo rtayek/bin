@@ -69,7 +69,7 @@ PORT="${3:-}"
 
 existing_port=$(
   awk -v dir="$DIR" '
-    $1 == "restart_webterm" && $3 == dir {
+    $1 == "ensure_webterm" && $3 == dir {
       print $2
       exit
     }
@@ -86,12 +86,12 @@ else
   if [ -z "$PORT" ]; then
     PORT=$(
       awk '
-        $1 == "restart_webterm" && $2 + 0 > max { max = $2 + 0 }
+        $1 == "ensure_webterm" && $2 + 0 > max { max = $2 + 0 }
         END { print max + 1 }
       ' "$WEBTERMS"
     )
   elif awk -v port="$PORT" '
-    $1 == "restart_webterm" && $2 == port { found=1 }
+    $1 == "ensure_webterm" && $2 == port { found=1 }
     END { exit !found }
   ' "$WEBTERMS"
   then
@@ -112,7 +112,7 @@ echo
 
 # 2. launch-webterms.sh entry
 if awk -v dir="$DIR" '
-  $1 == "restart_webterm" && $3 == dir { found=1 }
+  $1 == "ensure_webterm" && $3 == dir { found=1 }
   END { exit !found }
 ' "$WEBTERMS"
 then
@@ -121,7 +121,7 @@ else
   echo "-- adding port $PORT to launch-webterms.sh --"
   # Guard against a missing trailing newline gluing the new line onto the old one.
   [ -z "$(tail -c1 "$WEBTERMS")" ] || printf '\n' >> "$WEBTERMS"
-  printf 'restart_webterm %s %s\n' "$PORT" "$DIR" >> "$WEBTERMS"
+  printf 'ensure_webterm %s %s\n' "$PORT" "$DIR" >> "$WEBTERMS"
 fi
 echo
 
@@ -134,7 +134,6 @@ else
   sed \
     -e "s|PROJECT_NAME|$NAME|g" \
     -e "s|BASH_URL|http://127.0.0.1:$PORT/|g" \
-    # editor was here
     -e "s|CHATGPT_URL|https://chatgpt.com/|g" \
     -e "s|CLAUDE_URL|https://claude.ai/|g" \
     -e "s|GITHUB_URL|https://github.com/rtayek/$NAME|g" \
