@@ -43,4 +43,4 @@ if [ "$INDEX" -lt 0 ]; then
 fi
 PROJECT_COLOR=${COLORS[$INDEX]}
 
-exec "$HOME/bin/launch-bash-boxes.sh" --kill "$PROJECT_COLOR" "$PROJECT_DIR"
+exec bash "$HOME/bin/launch-bash-boxes.sh" --kill "$PROJECT_COLOR" "$PROJECT_DIR"
