@@ -16,31 +16,30 @@ PROJECT=${URI#rayproject://}
 PROJECT=${PROJECT%%[/?#]*}
 [ -n "$PROJECT" ] || { echo "error: missing project name" >&2; exit 2; }
 
-REGISTRY="$HOME/dotfiles/bin/launch-webterms.sh"
-[ -f "$REGISTRY" ] || { echo "error: missing $REGISTRY" >&2; exit 1; }
+REGISTRY="${PROJECTS_FILE:-$HOME/eclipse-workspace/dotmdfiles/projects.txt}"
+[ -f "$REGISTRY" ] || { echo "error: missing project registry: $REGISTRY" >&2; exit 1; }
 
 MATCH=$(
-  awk -v project="$PROJECT" '
-    ($1 == "ensure_webterm" || $1 == "restart_webterm") {
-      dir=$3
-      n=split(dir, parts, "/")
-      if (parts[n] == project) {
-        print $2 "|" dir
-        exit
-      }
+  awk -F'|' -v project="$PROJECT" '
+    $1 == project {
+      print $2 "|" $3 "|" $4
+      exit
     }
   ' "$REGISTRY"
 )
 
 [ -n "$MATCH" ] || { echo "error: project not registered: $PROJECT" >&2; exit 1; }
-PORT=${MATCH%%|*}
-PROJECT_DIR=${MATCH#*|}
+PROJECT_PATH=${MATCH%%|*}
+REST=${MATCH#*|}
+PORT=${REST%%|*}
+PROJECT_COLOR=${REST#*|}
 
-COLORS=(Red Green Blue Cyan Magenta Yellow)
-INDEX=$(( (PORT - 1031) % ${#COLORS[@]} ))
-if [ "$INDEX" -lt 0 ]; then
-  INDEX=$((INDEX + ${#COLORS[@]}))
-fi
-PROJECT_COLOR=${COLORS[$INDEX]}
+case "$PROJECT_PATH" in
+  '~/'*) PROJECT_DIR="$HOME/${PROJECT_PATH#~/}" ;;
+  *) PROJECT_DIR="$PROJECT_PATH" ;;
+esac
+
+[ -n "$PORT" ] || { echo "error: no webterm port registered for $PROJECT" >&2; exit 1; }
+[ -n "$PROJECT_COLOR" ] || { echo "error: no terminal color registered for $PROJECT" >&2; exit 1; }
 
 exec bash "$HOME/bin/launch-bash-boxes.sh" --kill "$PROJECT_COLOR" "$PROJECT_DIR"
