@@ -98,24 +98,23 @@ if [ ! -f "$HELPER" ]; then
   exit 1
 fi
 
-start_tab_args() {
+helper_command() {
   local role=$1
-  printf -v helper_cmd '%q ' "$HELPER" "$PROJECT_NAME" "$role" "$PROJECT_DIR"
-  TAB_COMMAND=("$BASH_EXE" -lc "$helper_cmd")
+  printf '%q ' bash "$HELPER" "$PROJECT_NAME" "$role" "$PROJECT_DIR"
 }
 
 echo "Launching $PROJECT_NAME Bash boxes in $PROJECT_COLOR"
 
-start_tab_args Bash
 wt.exe -w "$WINDOW_NAME" --pos 0,0 --maximized \
   new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" \
-  --title "$PROJECT_NAME - Bash" --suppressApplicationTitle "${TAB_COMMAND[@]}" ';' \
+  --title "$PROJECT_NAME - Bash" --suppressApplicationTitle \
+  "$BASH_EXE" -lc "$(helper_command Bash)" ';' \
   new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" \
   --title "$PROJECT_NAME - Claude" --suppressApplicationTitle \
-  "$BASH_EXE" -lc "$(printf '%q ' "$HELPER" "$PROJECT_NAME" Claude "$PROJECT_DIR")" ';' \
+  "$BASH_EXE" -lc "$(helper_command Claude)" ';' \
   new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" \
   --title "$PROJECT_NAME - Codex" --suppressApplicationTitle \
-  "$BASH_EXE" -lc "$(printf '%q ' "$HELPER" "$PROJECT_NAME" Codex "$PROJECT_DIR")" ';' \
+  "$BASH_EXE" -lc "$(helper_command Codex)" ';' \
   new-tab -p "$PROJECT_COLOR" -d "$WIN_PROJECT_PATH" --tabColor "$COLOR_HEX" \
   --title "$PROJECT_NAME - Gemini" --suppressApplicationTitle \
-  "$BASH_EXE" -lc "$(printf '%q ' "$HELPER" "$PROJECT_NAME" Gemini "$PROJECT_DIR")"
+  "$BASH_EXE" -lc "$(helper_command Gemini)"
