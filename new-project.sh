@@ -2,24 +2,10 @@
 # new-project.sh - wire a new project up to the standard set of tools.
 #
 # Runs, in order:
-#   1. dotmdfiles/bin/setup-project.sh   (CLAUDE.md, AGENTS.md, persona.md, human.md)
-#   2. reuse or allocate webterm port + launch-webterms.sh entry
+#   1. dotmdfiles/bin/setup-project.sh
+#   2. reuse or allocate project registry port/color
 #   3. project-home.html generated from the dotfiles template
-#   4. .envrc with PROJECT_TERMINAL_NAME (and useProjectHistory if new)
-#
-# Usage:
-#   new-project.sh <name> [target-dir] [port]
-#   new-project.sh -h
-#   new-project.sh --help
-#
-#   name         Project name, used for the title/links (e.g. five-rules)
-#   target-dir   Defaults to ~/eclipse-workspace/<name>
-#   port         Reuses the registered project port when present; otherwise
-#                defaults to the next unused port after the highest one
-#
-# Example:
-#   new-project.sh five-rules
-#   new-project.sh five-rules ~/eclipse-workspace/five-rules 1034
+#   4. .envrc with PROJECT_TERMINAL_NAME
 
 set -euo pipefail
 
@@ -55,77 +41,72 @@ esac
 
 DOTFILES="$HOME/dotfiles"
 DOTMDFILES="$HOME/eclipse-workspace/dotmdfiles"
-WEBTERMS="$DOTFILES/bin/launch-webterms.sh"
+REGISTRY="${PROJECTS_FILE:-$DOTMDFILES/projects.txt}"
 MACRO="$DOTFILES/templates/project-home.html.macro"
 
 NAME="$1"
 DIR="${2:-$HOME/eclipse-workspace/$NAME}"
 PORT="${3:-}"
 
-[ -f "$WEBTERMS" ] || { echo "missing $WEBTERMS" >&2; exit 1; }
+[ -f "$REGISTRY" ] || { echo "missing $REGISTRY" >&2; exit 1; }
 [ -f "$MACRO" ] || { echo "missing $MACRO" >&2; exit 1; }
 [ -x "$DOTMDFILES/bin/setup-project.sh" ] ||
   { echo "missing $DOTMDFILES/bin/setup-project.sh" >&2; exit 1; }
 
-existing_port=$(
-  awk -v dir="$DIR" '
-    $1 == "ensure_webterm" && $3 == dir {
-      print $2
-      exit
-    }
-  ' "$WEBTERMS"
+existing=$(
+  awk -F'|' -v name="$NAME" '$1 == name { print $2 "|" $3 "|" $4; exit }' "$REGISTRY"
 )
 
-if [ -n "$existing_port" ]; then
-  if [ -n "$PORT" ] && [ "$PORT" != "$existing_port" ]; then
-    echo "error: $DIR is already registered on port $existing_port" >&2
+if [ -n "$existing" ]; then
+  registered_path=${existing%%|*}
+  rest=${existing#*|}
+  existing_port=${rest%%|*}
+  existing_color=${rest#*|}
+
+  if [ -n "$PORT" ] && [ -n "$existing_port" ] && [ "$PORT" != "$existing_port" ]; then
+    echo "error: $NAME is already registered on port $existing_port" >&2
     exit 1
   fi
-  PORT=$existing_port
+  PORT=${existing_port:-$PORT}
+  COLOR=$existing_color
 else
   if [ -z "$PORT" ]; then
     PORT=$(
-      awk '
-        $1 == "ensure_webterm" && $2 + 0 > max { max = $2 + 0 }
-        END { print max + 1 }
-      ' "$WEBTERMS"
+      awk -F'|' '$3 ~ /^[0-9]+$/ && $3 + 0 > max { max=$3 + 0 } END { print (max ? max + 1 : 1031) }' "$REGISTRY"
     )
-  elif awk -v port="$PORT" '
-    $1 == "ensure_webterm" && $2 == port { found=1 }
-    END { exit !found }
-  ' "$WEBTERMS"
+  elif awk -F'|' -v port="$PORT" '$3 == port { found=1 } END { exit !found }' "$REGISTRY"
   then
     echo "error: port $PORT is already registered to another project" >&2
     exit 1
   fi
+
+  colors=(Red Green Blue Cyan Magenta Yellow)
+  index=$(( (PORT - 1031) % ${#colors[@]} ))
+  (( index < 0 )) && index=$((index + ${#colors[@]}))
+  COLOR=${colors[$index]}
+
+  case "$DIR" in
+    "$HOME"/*) registry_path="~/${DIR#"$HOME"/}" ;;
+    *) registry_path="$DIR" ;;
+  esac
+
+  [ -z "$(tail -c1 "$REGISTRY")" ] || printf '\n' >> "$REGISTRY"
+  printf '%s|%s|%s|%s||\n' "$NAME" "$registry_path" "$PORT" "$COLOR" >> "$REGISTRY"
 fi
+
+[ -n "$PORT" ] || { echo "error: project has no webterm port: $NAME" >&2; exit 1; }
+[ -n "$COLOR" ] || { echo "error: project has no terminal color: $NAME" >&2; exit 1; }
 
 echo "Project:    $NAME"
 echo "Directory:  $DIR"
 echo "Port:       $PORT"
+echo "Color:      $COLOR"
 echo
 
-# 1. LLM context files
 echo "-- setup-project.sh --"
 "$DOTMDFILES/bin/setup-project.sh" "$DIR"
 echo
 
-# 2. launch-webterms.sh entry
-if awk -v dir="$DIR" '
-  $1 == "ensure_webterm" && $3 == dir { found=1 }
-  END { exit !found }
-' "$WEBTERMS"
-then
-  echo "-- launch-webterms.sh already has $DIR on port $PORT, skipping --"
-else
-  echo "-- adding port $PORT to launch-webterms.sh --"
-  # Guard against a missing trailing newline gluing the new line onto the old one.
-  [ -z "$(tail -c1 "$WEBTERMS")" ] || printf '\n' >> "$WEBTERMS"
-  printf 'ensure_webterm %s %s\n' "$PORT" "$DIR" >> "$WEBTERMS"
-fi
-echo
-
-# 3. project-home.html from template
 HOME_HTML="$DIR/project-home.html"
 if [ -e "$HOME_HTML" ]; then
   echo "-- $HOME_HTML already exists, skipping --"
@@ -141,7 +122,6 @@ else
 fi
 echo
 
-# 4. .envrc with PROJECT_TERMINAL_NAME
 ENVRC="$DIR/.envrc"
 if [ -e "$ENVRC" ]; then
   if grep -q PROJECT_TERMINAL_NAME "$ENVRC"; then
@@ -166,5 +146,6 @@ fi
 echo
 echo "Done. Remaining manual steps:"
 echo "  - run 'direnv allow' in $DIR"
+echo "  - run ~/dotfiles/bin/launch-webterms.sh if the webterm is not already running"
 echo "  - create a Chrome tab group and add $HOME_HTML as the anchor tab"
-echo "  - commit and push the launch-webterms.sh change in dotfiles if it changed"
+echo "  - commit and push projects.txt in dotmdfiles if the registry changed"
