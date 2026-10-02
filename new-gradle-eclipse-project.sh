@@ -3,182 +3,115 @@
 set -eu
 
 usage() {
-    echo "usage: $0 NEW_PROJECT_DIRECTORY [PACKAGE_NAME] [CHATMAP_DIRECTORY]" >&2
-    echo "example: $0 /d/Dev/projects/hello org.ray.hello" >&2
+    echo "usage: $0 NEW_PROJECT_DIRECTORY [PACKAGE_NAME] [TEMPLATE_DIRECTORY]" >&2
+    echo "example: $0 ~/eclipse-workspace/hello org.ray.hello" >&2
     exit 2
 }
 
 [ "$#" -ge 1 ] && [ "$#" -le 3 ] || usage
 
-project_directory=$1
-project_name=$(basename "$project_directory")
-default_package=$(printf '%s' "$project_name" | tr '[:upper:]-' '[:lower:]_')
-package_name=${2:-$default_package}
-chatmap_directory=${3:-$(dirname "$project_directory")/chatmap}
+projectDirectory=$1
+projectName=$(basename "$projectDirectory")
+defaultPackage=$(printf '%s' "$projectName" | tr '[:upper:]-' '[:lower:]_')
+packageName=${2:-$defaultPackage}
+templateDirectory=${3:-${GRADLE_ECLIPSE_TEMPLATE:-"$HOME/eclipse-workspace/gradle-eclipse-template"}}
 
-case "$project_name" in
+templateProjectName=gradle-eclipse-template
+templatePackage=org.ray.template
+templatePackageDirectory=org/ray/template
+
+case "$projectName" in
     ""|*[!A-Za-z0-9._-]*)
         echo "error: project name must contain only letters, digits, dots, underscores, or hyphens" >&2
         exit 1
         ;;
 esac
 
-if ! printf '%s\n' "$package_name" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$'; then
-    echo "error: invalid Java package name: $package_name" >&2
+if ! printf '%s\n' "$packageName" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$'; then
+    echo "error: invalid Java package name: $packageName" >&2
     exit 1
 fi
 
-if [ -e "$project_directory" ]; then
-    echo "error: destination already exists: $project_directory" >&2
+if [ -e "$projectDirectory" ]; then
+    echo "error: destination already exists: $projectDirectory" >&2
     exit 1
 fi
 
-for wrapper_file in \
+[ -d "$templateDirectory" ] || {
+    echo "error: Gradle Eclipse template not found: $templateDirectory" >&2
+    echo "expected a checkout of the gradle-eclipse-template project" >&2
+    exit 1
+}
+
+for requiredFile in \
     gradlew \
     gradlew.bat \
     gradle/wrapper/gradle-wrapper.jar \
-    gradle/wrapper/gradle-wrapper.properties
+    gradle/wrapper/gradle-wrapper.properties \
+    build.gradle.kts \
+    settings.gradle.kts \
+    config/checkstyle/checkstyle.xml \
+    config/pmd/pmd.xml \
+    config/spotbugs/exclude.xml
 do
-    if [ ! -f "$chatmap_directory/$wrapper_file" ]; then
-        echo "error: ChatMap wrapper file not found: $chatmap_directory/$wrapper_file" >&2
+    if [ ! -f "$templateDirectory/$requiredFile" ]; then
+        echo "error: template file not found: $templateDirectory/$requiredFile" >&2
         exit 1
     fi
 done
 
-package_directory=$(printf '%s' "$package_name" | tr '.' '/')
+packageDirectory=$(printf '%s' "$packageName" | tr '.' '/')
 
-mkdir -p \
-    "$project_directory/gradle/wrapper" \
-    "$project_directory/src/$package_directory" \
-    "$project_directory/tst/$package_directory"
+mkdir -p "$projectDirectory"
+cp -R "$templateDirectory/." "$projectDirectory/"
 
-cp "$chatmap_directory/gradlew" "$project_directory/gradlew"
-cp "$chatmap_directory/gradlew.bat" "$project_directory/gradlew.bat"
-cp "$chatmap_directory/gradle/wrapper/gradle-wrapper.jar" \
-    "$project_directory/gradle/wrapper/gradle-wrapper.jar"
-cp "$chatmap_directory/gradle/wrapper/gradle-wrapper.properties" \
-    "$project_directory/gradle/wrapper/gradle-wrapper.properties"
-chmod +x "$project_directory/gradlew"
+# Never clone repository identity or generated IDE/build output.
+rm -rf \
+    "$projectDirectory/.git" \
+    "$projectDirectory/.gradle" \
+    "$projectDirectory/build" \
+    "$projectDirectory/bin" \
+    "$projectDirectory/lib" \
+    "$projectDirectory/.classpath" \
+    "$projectDirectory/.project" \
+    "$projectDirectory/.settings"
 
-cat > "$project_directory/settings.gradle.kts" <<EOF
-pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        mavenCentral()
-    }
-}
+# Move the template package tree before replacing package declarations.
+for sourceRoot in src tst; do
+    oldPackageDirectory="$projectDirectory/$sourceRoot/$templatePackageDirectory"
+    if [ -d "$oldPackageDirectory" ]; then
+        newPackageDirectory="$projectDirectory/$sourceRoot/$packageDirectory"
+        mkdir -p "$newPackageDirectory"
+        cp -R "$oldPackageDirectory/." "$newPackageDirectory/"
+        rm -rf "$projectDirectory/$sourceRoot/org"
+    fi
+done
 
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        mavenCentral()
-    }
-}
+# Replace template identity in ordinary text files.
+find "$projectDirectory" -type f \
+    ! -path '*/gradle-wrapper.jar' \
+    -exec sh -c '
+        for file do
+            if grep -Iq . "$file" 2>/dev/null; then
+                sed \
+                    -e "s|gradle-eclipse-template|$1|g" \
+                    -e "s|org\.ray\.template|$2|g" \
+                    "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+            fi
+        done
+    ' sh "$projectName" "$packageName" {} +
 
-rootProject.name = "$project_name"
-EOF
-
-cat > "$project_directory/build.gradle.kts" <<'EOF'
-plugins {
-    java
-    eclipse
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
-    }
-}
-
-sourceSets {
-    main {
-        java.setSrcDirs(listOf("src"))
-        resources {
-            setSrcDirs(listOf("src"))
-            exclude("**/*.java")
-        }
-    }
-    test {
-        java.setSrcDirs(listOf("tst"))
-        resources {
-            setSrcDirs(listOf("tst"))
-            exclude("**/*.java")
-        }
-    }
-}
-
-dependencies {
-    testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
-}
-EOF
-
-cat > "$project_directory/.gitignore" <<'EOF'
-.gradle/
-/build/
-/bin/
-
-.classpath
-.project
-.settings/
-
-*.class
-*.log
-*.tmp
-EOF
-
-cat > "$project_directory/src/$package_directory/Example.java" <<EOF
-package $package_name;
-
-class Example {
-    public int add(int left, int right) {
-        return left + right;
-    }
-}
-EOF
-
-cat > "$project_directory/tst/$package_directory/ExampleTest.java" <<EOF
-package $package_name;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import org.junit.jupiter.api.Test;
-
-class ExampleTest {
-    @Test
-    void addsTwoNumbers() {
-        assertEquals(5, new Example().add(2, 3));
-    }
-}
-EOF
-
-cat > "$project_directory/README.md" <<EOF
-# $project_name
-
-Build and test:
-
-\`\`\`sh
-./gradlew test
-\`\`\`
-
-Regenerate Eclipse metadata:
-
-\`\`\`sh
-./gradlew eclipse
-\`\`\`
-EOF
+chmod +x "$projectDirectory/gradlew"
 
 (
-    cd "$project_directory"
-    ./gradlew eclipse test
+    cd "$projectDirectory"
+    ./gradlew eclipse check
     ./gradlew clean
 )
 
 echo
-echo "Created and verified: $project_directory"
-echo "Eclipse: File -> Import -> Existing Projects into Workspace"
+echo "Created and verified: $projectDirectory"
+echo "Template: $templateDirectory"
+echo "Verification: ./gradlew eclipse check"
+echo "Eclipse: File -> Import -> General -> Existing Projects into Workspace"
 echo "Leave 'Copy projects into workspace' unchecked."
