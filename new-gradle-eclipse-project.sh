@@ -14,7 +14,7 @@ projectDirectory=$1
 projectName=$(basename "$projectDirectory")
 defaultPackage=$(printf '%s' "$projectName" | tr '[:upper:]-' '[:lower:]_')
 packageName=${2:-$defaultPackage}
-templateDirectory=${3:-${GRADLE_ECLIPSE_TEMPLATE:-"$HOME/eclipse-workspace/gradle-eclipse-template"}}
+templateDirectory=${3:-${GRADLE_ECLIPSE_TEMPLATE:-"$HOME/eclipse-workspace/project"}}
 
 templateProjectName=gradle-eclipse-template
 templatePackage=org.ray.template
@@ -39,7 +39,7 @@ fi
 
 [ -d "$templateDirectory" ] || {
     echo "error: Gradle Eclipse template not found: $templateDirectory" >&2
-    echo "expected a checkout of the gradle-eclipse-template project" >&2
+    echo "expected a checkout of https://github.com/rtayek/project.git" >&2
     exit 1
 }
 
