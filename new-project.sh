@@ -107,9 +107,12 @@ if [ -n "$existing" ]; then
     existingColor=${rest#*|}
     directory=$(resolvePath "$registeredPath")
 
-    if [ -n "$requestedDirectory" ] && [ "$requestedDirectory" != "$directory" ]; then
-        echo "error: $name is registered at $directory, not $requestedDirectory" >&2
-        exit 1
+    if [ -n "$requestedDirectory" ]; then
+        requestedPath=$(resolvePath "$requestedDirectory")
+        if [ "$requestedPath" != "$directory" ]; then
+            echo "error: $name is registered at $directory, not $requestedPath" >&2
+            exit 1
+        fi
     fi
     if [ -n "$port" ] && [ -n "$existingPort" ] && [ "$port" != "$existingPort" ]; then
         echo "error: $name is already registered on port $existingPort" >&2
@@ -118,7 +121,11 @@ if [ -n "$existing" ]; then
     port=${existingPort:-$port}
     color=$existingColor
 else
-    directory=${requestedDirectory:-"$HOME/eclipse-workspace/$name"}
+    if [ -n "$requestedDirectory" ]; then
+        directory=$(resolvePath "$requestedDirectory")
+    else
+        directory="$HOME/eclipse-workspace/$name"
+    fi
 
     if [ -z "$port" ]; then
         port=$(
