@@ -11,7 +11,8 @@ Usage:
 
 Arguments:
   name        Project name, for example five-rules
-  target-dir  Default: ~/eclipse-workspace/<name>
+  target-dir  Default for a new project: ~/eclipse-workspace/<name>
+              Existing projects always use their registered path.
   port        Reuse registered port, otherwise next unused webterm port
 EOF
 }
@@ -32,21 +33,68 @@ case "${1:-}" in
         ;;
 esac
 
-dotfiles="$HOME/dotfiles"
-dotmdfiles="$HOME/eclipse-workspace/dotmdfiles"
-systemRoot="$HOME/eclipse-workspace/system"
-defaultProjectsFile="$systemRoot/projects.tsv"
-projectsFile=${projectsFile:-${PROJECTS_FILE:-"$defaultProjectsFile"}}
-macro="$dotfiles/templates/project-home.html.macro"
+projectsRoot=${projectsRoot:-${PROJECTS_ROOT:-"$HOME/eclipse-workspace"}}
 
-name=$1
-directory=${2:-"$HOME/eclipse-workspace/$name"}
-port=${3:-}
+resolvePath() {
+    local value=$1
+    case "$value" in
+        "~")
+            printf '%s\n' "$HOME"
+            ;;
+        "~/"*)
+            printf '%s/%s\n' "$HOME" "${value#??}"
+            ;;
+        /*|[A-Za-z]:/*)
+            printf '%s\n' "$value"
+            ;;
+        *)
+            printf '%s/%s\n' "$projectsRoot" "$value"
+            ;;
+    esac
+}
+
+projectPathByName() {
+    local projectName=$1
+    local registryFile=$2
+    local value
+
+    value=$(awk -F '\t' -v name="$projectName" 'NR > 1 && $1 == name { print $2; exit }' "$registryFile")
+    [ -n "$value" ] || return 1
+    resolvePath "$value"
+}
+
+explicitProjectsFile=${projectsFile:-${PROJECTS_FILE:-}}
+if [ -n "$explicitProjectsFile" ]; then
+    projectsFile=$explicitProjectsFile
+    [ -f "$projectsFile" ] || { echo "missing $projectsFile" >&2; exit 1; }
+    systemRoot=$(projectPathByName system "$projectsFile") ||
+        { echo "registry has no system project: $projectsFile" >&2; exit 1; }
+    defaultProjectsFile="$systemRoot/projects.tsv"
+else
+    deployedProjectsFile="$HOME/.config/ray/projects.tsv"
+    [ -f "$deployedProjectsFile" ] ||
+        { echo "missing $deployedProjectsFile" >&2; exit 1; }
+    systemRoot=$(projectPathByName system "$deployedProjectsFile") ||
+        { echo "registry has no system project: $deployedProjectsFile" >&2; exit 1; }
+    defaultProjectsFile="$systemRoot/projects.tsv"
+    projectsFile=$defaultProjectsFile
+fi
 
 [ -f "$projectsFile" ] || { echo "missing $projectsFile" >&2; exit 1; }
+
+dotmdfiles=$(projectPathByName dotmdfiles "$projectsFile") ||
+    { echo "registry has no dotmdfiles project: $projectsFile" >&2; exit 1; }
+dotfiles=$(projectPathByName dotfiles "$projectsFile") ||
+    { echo "registry has no dotfiles project: $projectsFile" >&2; exit 1; }
+macro="$dotfiles/templates/project-home.html.macro"
+
 [ -f "$macro" ] || { echo "missing $macro" >&2; exit 1; }
 [ -x "$dotmdfiles/bin/setup-project.sh" ] ||
     { echo "missing $dotmdfiles/bin/setup-project.sh" >&2; exit 1; }
+
+name=$1
+requestedDirectory=${2:-}
+port=${3:-}
 
 existing=$(
     awk -F '\t' -v name="$name" 'NR > 1 && $1 == name { print $2 "|" $3 "|" $4; exit }' "$projectsFile"
@@ -57,7 +105,12 @@ if [ -n "$existing" ]; then
     rest=${existing#*|}
     existingPort=${rest%%|*}
     existingColor=${rest#*|}
+    directory=$(resolvePath "$registeredPath")
 
+    if [ -n "$requestedDirectory" ] && [ "$requestedDirectory" != "$directory" ]; then
+        echo "error: $name is registered at $directory, not $requestedDirectory" >&2
+        exit 1
+    fi
     if [ -n "$port" ] && [ -n "$existingPort" ] && [ "$port" != "$existingPort" ]; then
         echo "error: $name is already registered on port $existingPort" >&2
         exit 1
@@ -65,6 +118,8 @@ if [ -n "$existing" ]; then
     port=${existingPort:-$port}
     color=$existingColor
 else
+    directory=${requestedDirectory:-"$HOME/eclipse-workspace/$name"}
+
     if [ -z "$port" ]; then
         port=$(
             awk -F '\t' 'NR > 1 && $3 ~ /^[0-9]+$/ && $3 + 0 > max { max=$3 + 0 } END { print (max ? max + 1 : 1031) }' "$projectsFile"
