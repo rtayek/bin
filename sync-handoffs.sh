@@ -17,17 +17,27 @@
 
 set -euo pipefail
 
-# Known project codes and where their local checkouts live, for routing
-# a handoff away from the current repo when its filename names a
-# different project. Fill in any paths that are missing or wrong for
-# this machine. A code with no path here is treated as unknown -- such a
-# file is left in Downloads with a warning rather than guessed at.
-declare -A KNOWN_PROJECT_PATHS=(
-    [SYS]="$HOME/eclipse-workspace/system"
-    [CM]="$HOME/eclipse-workspace/chatmap"
-    [DMF]="$HOME/eclipse-workspace/dotmdfiles"
-    [DF]="$HOME/eclipse-workspace/dotfiles"
+projectsFile=${projectsFile:-${PROJECTS_FILE:-"$HOME/.config/ray/projects.tsv"}}
+projectsRoot=${projectsRoot:-${PROJECTS_ROOT:-"$HOME/eclipse-workspace"}}
+
+declare -A PROJECT_NAMES=(
+    [SYS]=system
+    [CM]=chatmap
+    [DMF]=dotmdfiles
+    [DF]=dotfiles
 )
+
+resolve_project_path() {
+    local project_name=$1 value
+    value=$(awk -F '\t' -v name="$project_name" 'NR > 1 && $1 == name { print $2; exit }' "$projectsFile")
+    [[ -n $value ]] || return 1
+    case "$value" in
+        "~") printf '%s\n' "$HOME" ;;
+        "~/"*) printf '%s/%s\n' "$HOME" "${value#??}" ;;
+        /*|[A-Za-z]:/*) printf '%s\n' "$value" ;;
+        *) printf '%s/%s\n' "$projectsRoot" "$value" ;;
+    esac
+}
 
 # Extract the destination project code from a handoff filename, if the
 # filename states one at all. Checks the "-to-<CODE>-" field first (the
@@ -43,7 +53,7 @@ destination_code_for() {
         return
     fi
     local code
-    for code in "${!KNOWN_PROJECT_PATHS[@]}"; do
+    for code in "${!PROJECT_NAMES[@]}"; do
         if [[ $upper == *"-$code-"* ]]; then
             echo "$code"
             return
@@ -73,10 +83,14 @@ if ! repo=$(git rev-parse --show-toplevel 2>/dev/null); then
     exit 1
 fi
 
+[[ -f $projectsFile ]] || { echo "Project registry not found: $projectsFile" >&2; exit 1; }
+
 current_code=""
-for code in "${!KNOWN_PROJECT_PATHS[@]}"; do
-    if [[ ${KNOWN_PROJECT_PATHS[$code]} == "$repo" ]]; then
-        current_code=$code
+for code in "${!PROJECT_NAMES[@]}"; do
+    if project_path=$(resolve_project_path "${PROJECT_NAMES[$code]}" 2>/dev/null); then
+        if [[ $project_path == "$repo" ]]; then
+            current_code=$code
+        fi
     fi
 done
 
@@ -133,7 +147,11 @@ for file in "${downloaded_handoffs[@]}"; do
         continue
     fi
 
-    target_repo=${KNOWN_PROJECT_PATHS[$code]:-}
+    target_project=${PROJECT_NAMES[$code]:-}
+    target_repo=""
+    if [[ -n $target_project ]]; then
+        target_repo=$(resolve_project_path "$target_project" 2>/dev/null || true)
+    fi
     if [[ -z $target_repo ]]; then
         echo "Unrecognized project code '$code' in $base, left in place." >&2
         continue
