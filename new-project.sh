@@ -11,9 +11,12 @@ Usage:
 
 Arguments:
   name        Project name, for example five-rules
-  target-dir  Default for a new project: ~/eclipse-workspace/<name>
-              Existing projects always use their registered path.
+  target-dir  Existing projects always use their registered path.
+              New projects default to newProjectsRoot/<name>.
   port        Reuse registered port, otherwise next unused webterm port
+
+Environment:
+  newProjectsRoot  Default root for new projects. Defaults to ~/eclipse-workspace.
 EOF
 }
 
@@ -34,6 +37,7 @@ case "${1:-}" in
 esac
 
 projectsRoot=${projectsRoot:-${PROJECTS_ROOT:-"$HOME/eclipse-workspace"}}
+newProjectsRoot=${newProjectsRoot:-"$HOME/eclipse-workspace"}
 
 resolvePath() {
     local value=$1
@@ -124,7 +128,7 @@ else
     if [ -n "$requestedDirectory" ]; then
         directory=$(resolvePath "$requestedDirectory")
     else
-        directory="$HOME/eclipse-workspace/$name"
+        directory="$newProjectsRoot/$name"
     fi
 
     if [ -z "$port" ]; then
